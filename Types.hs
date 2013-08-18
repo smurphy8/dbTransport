@@ -3,6 +3,7 @@ module Types where
 import Data.Time
 import System.Locale
 import Prelude
+import Safe
 import Data.Text
 
 data OnpingTagHistory = OnpingTagHistory { 
@@ -30,23 +31,24 @@ type Buildable a = NameAndLine -> Either String (a,Text)
 parseArchiveTime::ParseTime t => Text -> Maybe t
 parseArchiveTime = (parseTime defaultTimeLocale "%F %X").unpack.fst.(breakOn ",")
 
-parseArchiveValue :: Text -> Maybe Int
+parseArchiveValue :: Text -> Maybe Double
 parseArchiveValue = readMay.unpack.strip.snd.(breakOnEnd ",") 
 
 parsePidValue :: Text -> Maybe Int 
 parsePidValue = readMay.unpack
 
-buildOnpingTagHistory :: NumAndLine -> Either String a
-buildOnpingTagHistory (NumAndLine pidT line) = let time = parseArchiveTime line
-                                                  val  = parseArchiveValue line
-                                                  pid  = parsePidValue
-                                              in case (OnpingTagHistory time pid val) of 
-                                                  good@ (OnpingTagHistory (Just a) (Just b) (Just v)  = Right good
-                                                         (OnpingTagHistory (Just _) (Just _) Nothing) = Either "missing Val"
-                                                         (OnpingTagHistory (Just _) Nothing (Just _)) = Either "missing pid"
-                                                         (OnpingTagHistory (Just _) Nothing Nothing)  = Either "missing time and pid"
-                                                         (OnpingTagHistory Nothing (Just _) (Just _)) = Either "missing tim"
-                                                         (OnpingTagHistory Nothing (Just _) Nothing)  = Either "missing tim and val"
-                                                         (OnpingTagHistory Nothing Nothing (Just _))  = Either "missing time and pid"
-                                                         (OnpingTagHistory Nothing Nothing Nothing)   = Either "missing all"
+buildOnpingTagHistory :: NameAndLine -> Either String OnpingTagHistory
+buildOnpingTagHistory (NameAndLine pidT line) = let time = parseArchiveTime line
+                                                    val  = parseArchiveValue line
+                                                    pid  = parsePidValue line
+                                                    oth  = (OnpingTagHistory time pid val)
+                                                in case oth of 
+                                                    (OnpingTagHistory (Just x) (Just y) (Just z))  ->  Right oth
+                                                    (OnpingTagHistory (Just _) (Just _) Nothing)   ->  Left  "missing Val"
+                                                    (OnpingTagHistory (Just _) Nothing (Just _))   ->  Left  "missing pid"
+                                                    (OnpingTagHistory (Just _) Nothing Nothing)    ->  Left  "missing time and pid"
+                                                    (OnpingTagHistory Nothing (Just _) (Just _))   ->  Left  "missing time"
+                                                    (OnpingTagHistory Nothing (Just _) Nothing)    ->  Left  "missing time and val"
+                                                    (OnpingTagHistory Nothing Nothing (Just _))    ->  Left  "missing time and pid"
+                                                    (OnpingTagHistory Nothing Nothing Nothing)     ->  Left  "missing all"
 

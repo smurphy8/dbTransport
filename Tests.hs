@@ -10,24 +10,18 @@ import Data.Text
 import Data.List
 import System.IO
 
-
-
 testDirectory = "./testArchive/"
-
 testFile = "./testArchive/105/2065/2013-03-13.txt"
-
 
 testMongoDBHost :: Text
 testMongoDBHost  = "localhost" 
 
-
-
 runTests :: IO () 
 runTests = do 
-  print "running testRetrieveSubFolders" >> (testRetrieveSubFolders )>>=(\x -> print x)
-  print "running testGetLocationPaths" >> (testRetrieveSubFolders )>>=(\x -> print x)
-  print "running testGetParamPaths" >> (testGetParamPaths ) >>= (\x -> print x)
-  print "running testGetParamFileNames" >> (testGetParamFileNames ) >>= (\x -> print x)
+  -- print "running testRetrieveSubFolders" >> (testRetrieveSubFolders )>>=(\x -> print x)
+  -- print "running testGetLocationPaths" >> (testRetrieveSubFolders )>>=(\x -> print x)
+  -- print "running testGetParamPaths" >> (testGetParamPaths ) >>= (\x -> print x)
+  -- print "running testGetParamFileNames" >> (testGetParamFileNames ) >>= (\x -> print x)
   print "running testBuildMongoRecord" >> testBuildMongoRecord >>= (\x -> print x)
 
 
@@ -55,3 +49,10 @@ testGetParamFileNames = do
 
 testBuildMongoRecord = do 
   buildMongoRecord testFile
+
+
+testLine :: Text 
+testLine = "2013-02-28 00:12:45,0\n"
+
+testParsecExperiment = do
+  parseCSV testLine 
