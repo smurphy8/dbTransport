@@ -7,6 +7,8 @@ import Data.Aeson
 import Data.Text
 import Data.Time
 import Types
+import qualified Text.Parsec as P
+import Text.Parsec.Text
 import qualified Data.Text.IO as TIO
 import Control.Monad
 import qualified System.IO as SIO
@@ -68,6 +70,11 @@ retrieveSubFiles dir = do
   return $ L.sort (tFiles)
   
 
+{-| Given a path to an archive file
+containing entries of the form:
+"2013-02-28 00:00:00,0"
+an OnpingTagHistory is produced
+|-}
 
 
 buildMongoRecord fPath = do 
@@ -85,7 +92,14 @@ openPidFileObj fPath = openTextFile fPath ReadMode
 getPidLine hPidFile = TIO.hGetLine hPidFile
 
 
+-- | From O'Sullivan, but adapted to use Text
+parseCSV :: Text -> Either P.ParseError [[String]]
+parseCSV input = P.parse csvFile "(unknown)" input
 
+csvFile = P.endBy line eol
+eol = P.char '\n'
+line = P.sepBy cell (P.char ',')
+cell = P.many (P.noneOf ",\n")
 
   
     
