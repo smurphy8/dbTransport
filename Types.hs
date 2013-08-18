@@ -24,8 +24,6 @@ data BuildableObject = B_OTH !OnpingTagHistory
 
 type Buildable a = NameAndLine -> Either String (a,Text)
 
-
-
 -- | Simple Parsers for Time and Value 
 
 parseArchiveTime::ParseTime t => Text -> Maybe t
