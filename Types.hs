@@ -11,8 +11,6 @@ data OnpingTagHistory = OnpingTagHistory {
       pid:: Maybe Int,
       val :: Maybe Double
 } deriving (Read, Show, Eq,Ord)
-
-
 data NameAndLine = NameAndLine { nlName::Text, nlLine::Text}
 
 
@@ -29,8 +27,17 @@ type Buildable a = NameAndLine -> Either String (a,Text)
 parseArchiveTime::ParseTime t => Text -> Maybe t
 parseArchiveTime = (parseTime defaultTimeLocale "%F %X").unpack.fst.(breakOn ",")
 
+parseArchiveTime'::ParseTime t => String -> Maybe t
+parseArchiveTime' = (parseTime defaultTimeLocale "%F %X")
+
+
 parseArchiveValue :: Text -> Maybe Double
 parseArchiveValue = readMay.unpack.strip.snd.(breakOnEnd ",") 
+
+
+parseArchiveValue' :: String -> Maybe Double 
+parseArchiveValue' = readMay
+
 
 parsePidValue :: Text -> Maybe Int 
 parsePidValue = readMay.unpack

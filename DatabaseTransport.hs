@@ -96,6 +96,33 @@ getPidLine hPidFile = TIO.hGetLine hPidFile
 parseCSV :: Text -> Either P.ParseError [[String]]
 parseCSV input = P.parse csvFile "(unknown)" input
 
+
+qt :: Text
+qt = "2013-02-28 00:00:00,1230.033"
+
+parseEntry :: Maybe Int -> Text -> Either P.ParseError (Maybe OnpingTagHistory)
+parseEntry pid i = P.parse (entryString pid) "(unknown)" i
+
+
+-- | Entry string takes advantage of the monadic form of Maybe to short circuit missing data pieces
+entryString mpid = do
+  fDate <- fullDateString
+  P.char ','
+  val <- valueString
+  let oth = do
+        d <- parseArchiveTime' fDate 
+        v <- parseArchiveValue' val
+        pid <- mpid
+        return $ OnpingTagHistory (Just d) (Just pid) (Just v)
+        
+  return $ oth
+
+  
+fullDateString = P.many (P.noneOf ",")
+
+valueString = do
+  P.many (P.noneOf "\n")
+  
 csvFile = P.endBy line eol
 eol = P.char '\n'
 line = P.sepBy cell (P.char ',')
