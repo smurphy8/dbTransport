@@ -2,9 +2,12 @@
 module Types where 
 import Data.Time
 import System.Locale
-import Prelude
+import Prelude hiding (FilePath)
 import Safe
 import Data.Text
+import System.Directory
+import Filesystem 
+import Filesystem.Path
 
 data OnpingTagHistory = OnpingTagHistory { 
       time :: Maybe UTCTime,
@@ -42,18 +45,27 @@ parseArchiveValue' = readMay
 parsePidValue :: Text -> Maybe Int 
 parsePidValue = readMay.unpack
 
-buildOnpingTagHistory :: NameAndLine -> Either String OnpingTagHistory
-buildOnpingTagHistory (NameAndLine pidT line) = let time = parseArchiveTime line
-                                                    val  = parseArchiveValue line
-                                                    pid  = parsePidValue line
-                                                    oth  = (OnpingTagHistory time pid val)
-                                                in case oth of 
-                                                    (OnpingTagHistory (Just x) (Just y) (Just z))  ->  Right oth
-                                                    (OnpingTagHistory (Just _) (Just _) Nothing)   ->  Left  "missing Val"
-                                                    (OnpingTagHistory (Just _) Nothing (Just _))   ->  Left  "missing pid"
-                                                    (OnpingTagHistory (Just _) Nothing Nothing)    ->  Left  "missing time and pid"
-                                                    (OnpingTagHistory Nothing (Just _) (Just _))   ->  Left  "missing time"
-                                                    (OnpingTagHistory Nothing (Just _) Nothing)    ->  Left  "missing time and val"
-                                                    (OnpingTagHistory Nothing Nothing (Just _))    ->  Left  "missing time and pid"
-                                                    (OnpingTagHistory Nothing Nothing Nothing)     ->  Left  "missing all"
 
+
+-- | Helper Type to pull the date out to the front for sorting against
+-- the File Touch Time
+
+
+
+data DatedFile = DatedFile { touchDate :: UTCTime,
+                           touchFile :: FilePath
+                         }
+
+              deriving (Eq,Show,Ord)
+
+
+-- | Newtypes for Location and PID folders 
+newtype LocationPath = LocationPath {getLocationPath :: DatedFile}
+    deriving (Eq,Show,Ord)
+
+newtype ParamPath = ParamPath {getParamPath :: DatedFile}
+    deriving (Eq,Show,Ord)
+
+
+newtype ParamFile = ParamFile {getParamFile :: DatedFile}
+    deriving (Eq,Show,Ord)

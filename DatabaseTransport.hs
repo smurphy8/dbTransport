@@ -2,15 +2,21 @@
 
 module DatabaseTransport where 
 import Prelude hiding (FilePath)
+import qualified Prelude as Pl
 import System.Locale
 import Data.Aeson
 import Data.Text
 import Data.Time
+import Data.Maybe
+
 import Types
 import qualified Text.Parsec as P
 import Text.Parsec.Text
 import qualified Data.Text.IO as TIO
 import Control.Monad
+import Data.Either
+import Control.Monad.Trans.Either
+import Control.Monad.Trans.Class
 import qualified System.IO as SIO
 import qualified Data.List as L
 import Data.Function 
@@ -23,38 +29,38 @@ import Control.Applicative
 
 
 -- |Takes the Archive Root and returns a list of the locations
+-- | Builders for specific types of files
+-- | Top folder level of the archive Tree
+-- Get Location Paths are folders named for location Id's
 
-getLocationPaths :: FilePath -> IO [DatedFile]
-getLocationPaths arcRoot = retrieveSubFolders arcRoot
+getLocationPaths :: FilePath -> IO [LocationPath]
+getLocationPaths arcRoot = do
+  sf <- retrieveSubFolders arcRoot
+  return $ (\x -> LocationPath x)  <$> sf
 
+-- | Param paths are the next nest down, with 
+-- the raw parameter ids making the names
+getParamPaths :: LocationPath -> IO [ParamPath] 
+getParamPaths (LocationPath (DatedFile _ lPath)) = do
+  sf <- retrieveSubFolders lPath
+  return $ (\x -> ParamPath x) <$> sf
 
-getParamPaths :: DatedFile -> IO [DatedFile] 
-getParamPaths (DatedFile _ lPath) = retrieveSubFolders lPath
+-- |These are the files inside each raw parameter Id folder
+-- | They are named after dates and contain OnpingTagHistory records
+getParamFileNames :: ParamPath -> IO [ParamFile]
+getParamFileNames (ParamPath (DatedFile _ pPath)) = do
+  sf <- retrieveSubFiles pPath
+  return $ (\x -> ParamFile x) <$> sf
 
-
-getParamFileNames :: DatedFile -> IO [DatedFile]
-getParamFileNames (DatedFile _ pPath) = retrieveSubFiles pPath
-
-
-
-
-
-
-
--- | Helper Type to pull the date out to the front for sorting against
--- the File Touch Time
-
-data DatedFile = DatedFile { touchDate :: UTCTime,
-                           touchFile :: FilePath
-                         }
-
-              deriving (Eq,Show,Ord)
-
+-- | Dated File Builders for the file system
+-- makes a DatedFile, a type with a date modified extracted to the front
 makeDatedFile :: FilePath -> IO DatedFile
 makeDatedFile f = do 
   date <- getModified f
   return $ DatedFile date f
-      
+
+-- | gets all the Folder Objects in a directory 
+-- makes them into DatedFiles      
 retrieveSubFolders :: FilePath -> IO [DatedFile]
 retrieveSubFolders dir = do 
   dirs <- listDirectory dir
@@ -76,15 +82,35 @@ containing entries of the form:
 an OnpingTagHistory is produced
 |-}
 
+buildMongoRecords :: ParamFile -> IO (Either () ([Maybe OnpingTagHistory]))
+buildMongoRecords (ParamFile (DatedFile _ pFile)) = do 
+  hPidFile <- openPidFileObj pFile
+  let pidNum = pack.show.dirname $ pFile
+  lst <- runOnpingHistoryParser pidNum hPidFile
+  SIO.hClose hPidFile
+  return $ lst
 
-buildMongoRecord fPath = do 
-  hPidFile <- openPidFileObj fPath
-  pLine <- getPidLine hPidFile
-  let pidNum = pack.show.dirname $ fPath 
-      nl = NameAndLine pidNum pLine
-  print pLine >> SIO.hClose hPidFile >> return () 
---  makeBuildable nl onpingTagBuilder
-  
+
+ 
+
+
+
+exit = left
+
+
+runOnpingHistoryParser pidNum hndle = runEitherT $ forever $ do 
+                                        eof <- lift (SIO.hIsEOF hndle) 
+                                        when eof $ exit ()                                       
+                                        return $ mapM parseLine [1 ..]
+    where parseLine x = do 
+            print "test"
+            line <- getPidLine hndle
+            return $ buildOnpingTagHistory $ NameAndLine pidNum line
+
+
+
+
+
 openPidFileObj :: FilePath -> IO Handle
 openPidFileObj fPath = openTextFile fPath ReadMode
  
@@ -93,12 +119,6 @@ getPidLine hPidFile = TIO.hGetLine hPidFile
 
 
 -- | From O'Sullivan, but adapted to use Text
-parseCSV :: Text -> Either P.ParseError [[String]]
-parseCSV input = P.parse csvFile "(unknown)" input
-
-
-qt :: Text
-qt = "2013-02-28 00:00:00,1230.033"
 
 parseEntry :: Maybe Int -> Text -> Either P.ParseError (Maybe OnpingTagHistory)
 parseEntry pid i = P.parse (entryString pid) "(unknown)" i
@@ -113,20 +133,16 @@ entryString mpid = do
         d <- parseArchiveTime' fDate 
         v <- parseArchiveValue' val
         pid <- mpid
-        return $ OnpingTagHistory (Just d) (Just pid) (Just v)
-        
+        return $ OnpingTagHistory (Just d) (Just pid) (Just v)        
   return $ oth
 
+
+
+buildOnpingTagHistory :: NameAndLine -> Either P.ParseError (Maybe OnpingTagHistory)
+buildOnpingTagHistory (NameAndLine pidT line) = parseEntry (parsePidValue pidT) line
+                                               
   
 fullDateString = P.many (P.noneOf ",")
-
 valueString = do
   P.many (P.noneOf "\n")
-  
-csvFile = P.endBy line eol
-eol = P.char '\n'
-line = P.sepBy cell (P.char ',')
-cell = P.many (P.noneOf ",\n")
 
-  
-    
