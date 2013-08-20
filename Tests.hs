@@ -12,11 +12,21 @@ import Types
 import qualified Data.List as L
 import System.IO
 
+
+-- | Data Stubs 
 testDirectory = "./testArchive/"
 testFile = "./testArchive/105/2065/2013-03-13.txt"
 
-testMongoDBHost :: Text
-testMongoDBHost  = "localhost" 
+testRunConfig = RunConfig testTimeStart testTimeEnd testDirectory
+
+testTimeStart = parseArchiveTime "2013-02-28 00:11:45"
+
+testTimeEnd = parseArchiveTime "2013-02-28 00:12:45"
+
+testLine :: Text 
+testLine = "2013-02-28 00:12:45,0\n"
+
+testDatabaseConfig = MongoConfig "127.0.0.1" "test" "onping_tag_history"
 
 runTests :: IO () 
 runTests = do 
@@ -27,6 +37,16 @@ runTests = do
   print "running testParsec"            >> return (testParsecExperiment) >>= (\x -> print x) 
   print "running testBuildMongoRecords" >> testBuildMongoRecords >>= (\x -> print (L.take 10 x))
   print "running testInsertMongoRecords" >> testInsertMongoRecords >>= (\x -> print x)
+  print "testDirectory is : " >> print testDirectory
+  print "testFile is: " >> print testFile 
+  print "testMongoDBCfg is:" >> print testDatabaseConfig
+  print "filterStartTime is:" >> print testTimeStart 
+  print "filterEndTime is :" >> print testTimeEnd 
+  print "fullInsertTest" >> testImportOnpingHistory
+  print "test complete"
+
+testImportOnpingHistory = do 
+  importOnpingHistory defaultDatabaseConfig testRunConfig
 
 testRetrieveSubFolders :: IO [DatedFile]
 testRetrieveSubFolders = do 
@@ -52,23 +72,24 @@ testGetParamFileNames =  do
 
 
 testBuildMongoRecords = do
+  let                            
+      s = testTimeStart
+      e = testTimeEnd
   lst <- testGetParamFileNames 
-  buildMongoRecords $ L.head.L.head.L.head $ lst
+  buildMongoRecords (dateRangeFilter s e) $ L.head.L.head.L.head $ lst
 
 
-
-
-testLine :: Text 
-testLine = "2013-02-28 00:12:45,0\n"
 
 testParsecExperiment = do
    buildOnpingTagHistory (NameAndLine "323" testLine)
 
 
 -- | testFile = "./testArchive/105/2065/2013-03-13.txt"
-testDatabaseConfig = MongoConfig "127.0.0.1" "test" "onping_tag_history"
+
 
 testInsertMongoRecords = do 
   records <- testBuildMongoRecords 
-  insertTagHistoryListWithFilter testDatabaseConfig idFilter records 
+  insertTagHistoryList testDatabaseConfig records 
+      
+
   

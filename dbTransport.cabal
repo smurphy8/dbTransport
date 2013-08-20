@@ -12,6 +12,7 @@ library
     exposed-modules: DatabaseTransport
                      Types
                      Tests
+                     Args
 
 
 
@@ -49,6 +50,7 @@ library
                        ,bson                     >= 0.2.1     &&   < 0.2.2
                        ,aeson                    >= 0.6.1.0   &&   < 0.7.1.0
                        ,HTTP                     >= 4000.2.8  &&   < 4000.3.8
+                       ,spawn                    >= 0.3       &&   < 0.4
                        ,http-conduit             >= 1.9.3     &&   < 2.0
                        ,safe                     >= 0.3.3     &&   < 0.4.3
                        ,text                     >= 0.11.2 

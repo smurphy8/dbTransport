@@ -5,9 +5,11 @@ import DatabaseTransport
 import System.Environment
 import System.Directory
 import Control.Monad
-import Tests
 import Data.Text
 import Data.List
+import Tests
+import Types
+import Args
 import System.IO
 
 
@@ -16,16 +18,16 @@ import System.IO
 
 main :: IO () 
 main = do 
-  runTests
-  print "test complete"
+  args <- getArgs
+  _ <- case filterArgs args of 
+         Test -> runTests
+         Help -> runHelp
+         Fail -> runFail args
+  return ()
 
 
--- | To run from command line
--- main :: IO () 
--- main = do 
---   args <- getArgs
---   progName <- getProgName 
---   putStrLn "The Arguments Are" 
---   mapM putStrLn args
---   putStrLn "Prog Name is:"
---   putStrLn progName
+
+
+
+-- |CommandLine Options
+

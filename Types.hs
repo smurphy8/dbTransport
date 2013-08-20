@@ -14,43 +14,33 @@ data OnpingTagHistory = OnpingTagHistory {
       pid:: Maybe Int,
       val :: Maybe Double
 } deriving (Read, Show, Eq,Ord)
+
 data NameAndLine = NameAndLine { nlName::Text, nlLine::Text}
-
-
 
 data BuildableObject = B_OTH !OnpingTagHistory
                      deriving (Read,Show,Eq,Ord)
 
-
-
 type Buildable a = NameAndLine -> Either String (a,Text)
 
--- | Simple Parsers for Time and Value 
 
-parseArchiveTime::ParseTime t => Text -> Maybe t
+-- | Simple Parsers for Time and Value 
+parseArchiveTime::Text -> Maybe UTCTime
 parseArchiveTime = (parseTime defaultTimeLocale "%F %X").unpack.fst.(breakOn ",")
 
-parseArchiveTime'::ParseTime t => String -> Maybe t
+parseArchiveTime':: String -> Maybe UTCTime
 parseArchiveTime' = (parseTime defaultTimeLocale "%F %X")
-
 
 parseArchiveValue :: Text -> Maybe Double
 parseArchiveValue = readMay.unpack.strip.snd.(breakOnEnd ",") 
 
-
 parseArchiveValue' :: String -> Maybe Double 
 parseArchiveValue' = readMay
-
 
 parsePidValue :: Text -> Maybe Int 
 parsePidValue = readMay.unpack
 
-
-
 -- | Helper Type to pull the date out to the front for sorting against
 -- the File Touch Time
-
-
 
 data DatedFile = DatedFile { touchDate :: UTCTime,
                            touchFile :: FilePath
@@ -69,3 +59,25 @@ newtype ParamPath = ParamPath {getParamPath :: DatedFile}
 
 newtype ParamFile = ParamFile {getParamFile :: DatedFile}
     deriving (Eq,Show,Ord)
+
+
+
+-- | Mongo Config options
+
+data MongoConfig = MongoConfig { 
+      mongoHost :: String
+      ,mongoDB :: Text 
+      ,mongoCollection :: Text
+    } deriving (Eq,Read,Show)
+
+
+
+data ConfigOptions =  Test | Help | Run RunConfig |Fail
+
+
+data OS = Windows | Linux
+
+data RunConfig = RunConfig { 
+      startDate :: Maybe UTCTime 
+      ,endDate :: Maybe UTCTime
+      ,archivePath :: FilePath}

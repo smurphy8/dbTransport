@@ -25,7 +25,7 @@ import Filesystem
 import Filesystem.Path
 import Filesystem.Path.Rules
 import Control.Applicative
-
+import Control.Concurrent.Spawn (parMapIO_)
 
 
 
@@ -83,8 +83,9 @@ containing entries of the form:
 an OnpingTagHistory is produced
 |-}
 
-buildMongoRecords :: ParamFile -> IO [OnpingTagHistory]
-buildMongoRecords (ParamFile (DatedFile _ pFile)) = do 
+buildMongoRecords ::  (OnpingTagHistory -> Maybe OnpingTagHistory) -> ParamFile ->
+                     IO [OnpingTagHistory]
+buildMongoRecords fltr (ParamFile (DatedFile _ pFile))  = do 
   hPidFile <- openPidFileObj pFile
   let ePidNum = (toText windows).dirname $ pFile --error if empty
   case ePidNum of 
@@ -92,7 +93,7 @@ buildMongoRecords (ParamFile (DatedFile _ pFile)) = do
     Right pidNum -> do  
                 lst <- runOnpingHistoryParser pidNum hPidFile
                 SIO.hClose hPidFile
-                return $ lst
+                return $ catMaybes $ fltr <$>  lst
 
 
  
@@ -104,7 +105,6 @@ buildMongoRecords (ParamFile (DatedFile _ pFile)) = do
 
 runOnpingHistoryParser pidNum hndle = do 
   pidLines <- getPidLines hndle
-  print pidNum
   let dirtyList = catMaybes.rights $ buildOnpingTagHistory.(\line ->  NameAndLine pidNum line) <$> pidLines
   return dirtyList 
 
@@ -156,33 +156,23 @@ valueString = do
   P.many (P.noneOf "\n")
 
 
-
--- | Mongo Insert Handlers
-
-data MongoConfig = MongoConfig { 
-      mongoHost :: String
-      ,mongoDB :: Text 
-      ,mongoCollection :: Text
-    } deriving (Eq,Read,Show)
-
-
 -- | insertTagHistoryListWith Filter uses a filter closure that operates
 -- on an OnpingTagHistory
 
 -- | (OnpingTagHistory -> Maybe OnpingTagHistory)
-
-insertTagHistoryListWithFilter mcfg othFilter opthList = do 
+insertTagHistoryList _ [] = return (Right ())
+insertTagHistoryList mcfg opthList = do 
+  print opthList
   pipe <- runIOE $ connect (host $ mongoHost mcfg)
-  e <- access pipe master (mongoDB mcfg) (run mcfg othFilter opthList)
+  e <- access pipe master (mongoDB mcfg) (runDB mcfg opthList)
   close pipe 
   return e 
 
-run mcfg othFilter opthList = do 
-  insertAll_ (mongoCollection mcfg) (catMaybes (filterAndConvert <$> opthList))
-      where filterAndConvert :: OnpingTagHistory -> Maybe Document
-            filterAndConvert ix = do 
-                                x <- othFilter ix
-                                othToDocument x
+runDB mcfg  opthList = do 
+  insertAll_ (mongoCollection mcfg) (catMaybes (convert <$> opthList))
+      where convert :: OnpingTagHistory -> Maybe Document
+            convert ix = do                        
+                       othToDocument ix
 
 -- |Some simpleFilters predefined
 
@@ -192,12 +182,25 @@ idFilter :: OnpingTagHistory -> Maybe OnpingTagHistory
 idFilter = return 
   
 -- |Date Range Filter
-dateRangeFilter :: UTCTime -> UTCTime -> OnpingTagHistory -> Maybe OnpingTagHistory
-dateRangeFilter st end o@(OnpingTagHistory (Just t) (Just p) (Just v) )
+dateRangeFilter :: Maybe UTCTime -> Maybe UTCTime -> OnpingTagHistory -> Maybe OnpingTagHistory
+dateRangeFilter (Just st) (Just end) o@(OnpingTagHistory (Just t) (Just p) (Just v) )
     | (st < end) && (st <= t) && (end > t) = Just o
     | otherwise = Nothing
+dateRangeFilter _ _ _ = Nothing
   
 
   
 
 
+defaultDatabaseConfig = MongoConfig "127.0.0.1" "test" "onping_tag_history"
+
+
+importOnpingHistory mcfg rcfg = do 
+  let importFilter = dateRangeFilter (startDate rcfg) (endDate rcfg)
+  locationPaths <- getLocationPaths (archivePath rcfg) 
+  paramPaths <- mapM getParamPaths locationPaths
+  paramFilesNest <- mapM (mapM getParamFileNames) paramPaths
+  let paramFilesList :: [ParamFile]
+      paramFilesList =  L.concat.L.concat $ paramFilesNest
+  opthList <- mapM (buildMongoRecords importFilter)  paramFilesList
+  insertTagHistoryList defaultDatabaseConfig `parMapIO_` opthList
