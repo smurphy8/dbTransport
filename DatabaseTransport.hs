@@ -202,5 +202,7 @@ importOnpingHistory mcfg rcfg = do
   paramFilesNest <- mapM (mapM getParamFileNames) paramPaths
   let paramFilesList :: [ParamFile]
       paramFilesList =  L.concat.L.concat $ paramFilesNest
+  putStrLn "Building mongo records"
   opthList <- (buildMongoRecords importFilter) `parMapIO` paramFilesList
+  putStrLn "Inserting mongo Records"
   insertTagHistoryList defaultDatabaseConfig `parMapIO_` opthList
