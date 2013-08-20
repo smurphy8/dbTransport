@@ -26,7 +26,7 @@ runTests = do
   print "running testGetParamFileNames" >> (testGetParamFileNames ) >>= (\x -> print x)
   print "running testParsec"            >> return (testParsecExperiment) >>= (\x -> print x) 
   print "running testBuildMongoRecords" >> testBuildMongoRecords >>= (\x -> print (L.take 10 x))
-
+  print "running testInsertMongoRecords" >> testInsertMongoRecords >>= (\x -> print x)
 
 testRetrieveSubFolders :: IO [DatedFile]
 testRetrieveSubFolders = do 
@@ -66,4 +66,9 @@ testParsecExperiment = do
 
 
 -- | testFile = "./testArchive/105/2065/2013-03-13.txt"
+testDatabaseConfig = MongoConfig "127.0.0.1" "test" "onping_tag_history"
 
+testInsertMongoRecords = do 
+  records <- testBuildMongoRecords 
+  insertTagHistoryListWithFilter testDatabaseConfig idFilter records 
+  
