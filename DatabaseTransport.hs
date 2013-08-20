@@ -23,6 +23,7 @@ import Data.Function
 import System.Directory
 import Filesystem 
 import Filesystem.Path
+import Filesystem.Path.Rules
 import Control.Applicative
 
 
@@ -82,13 +83,16 @@ containing entries of the form:
 an OnpingTagHistory is produced
 |-}
 
-buildMongoRecords :: ParamFile -> IO (Either () ([Maybe OnpingTagHistory]))
+buildMongoRecords :: ParamFile -> IO [OnpingTagHistory]
 buildMongoRecords (ParamFile (DatedFile _ pFile)) = do 
   hPidFile <- openPidFileObj pFile
-  let pidNum = pack.show.dirname $ pFile
-  lst <- runOnpingHistoryParser pidNum hPidFile
-  SIO.hClose hPidFile
-  return $ lst
+  let ePidNum = (toText windows).dirname $ pFile --error if empty
+  case ePidNum of 
+    Left _ -> return []
+    Right pidNum -> do  
+                lst <- runOnpingHistoryParser pidNum hPidFile
+                SIO.hClose hPidFile
+                return $ lst
 
 
  
@@ -98,14 +102,10 @@ buildMongoRecords (ParamFile (DatedFile _ pFile)) = do
 exit = left
 
 
-runOnpingHistoryParser pidNum hndle = runEitherT $ forever $ do 
-                                        eof <- lift (SIO.hIsEOF hndle) 
-                                        when eof $ exit ()                                       
-                                        return $ mapM parseLine [1 ..]
-    where parseLine x = do 
-            print "test"
-            line <- getPidLine hndle
-            return $ buildOnpingTagHistory $ NameAndLine pidNum line
+runOnpingHistoryParser pidNum hndle = do 
+  pidLines <- getPidLines hndle
+  print pidNum
+  return $ catMaybes.rights $ buildOnpingTagHistory.(\line ->  NameAndLine pidNum line) <$> pidLines
 
 
 
@@ -115,7 +115,10 @@ openPidFileObj :: FilePath -> IO Handle
 openPidFileObj fPath = openTextFile fPath ReadMode
  
 
-getPidLine hPidFile = TIO.hGetLine hPidFile
+getPidLines hPidFile = do
+  pidFile <- TIO.hGetContents hPidFile
+  return $ Data.Text.lines pidFile
+  
 
 
 -- | From O'Sullivan, but adapted to use Text

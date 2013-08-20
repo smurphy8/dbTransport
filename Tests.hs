@@ -24,7 +24,8 @@ runTests = do
   print "running testGetLocationPaths" >> (testRetrieveSubFolders )>>=(\x -> print x)
   print "running testGetParamPaths" >> (testGetParamPaths ) >>= (\x -> print x)
   print "running testGetParamFileNames" >> (testGetParamFileNames ) >>= (\x -> print x)
-  print "running testBuildMongoRecords" >> testBuildMongoRecords >>= (\x -> print x)
+  print "running testParsec"            >> return (testParsecExperiment) >>= (\x -> print x) 
+  print "running testBuildMongoRecords" >> testBuildMongoRecords >>= (\x -> print (L.take 10 x))
 
 
 testRetrieveSubFolders :: IO [DatedFile]
