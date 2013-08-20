@@ -25,7 +25,7 @@ import Filesystem
 import Filesystem.Path
 import Filesystem.Path.Rules
 import Control.Applicative
-import Control.Concurrent.Spawn (parMapIO_)
+import Control.Concurrent.Spawn (parMapIO_,parMapIO)
 
 
 
@@ -202,5 +202,5 @@ importOnpingHistory mcfg rcfg = do
   paramFilesNest <- mapM (mapM getParamFileNames) paramPaths
   let paramFilesList :: [ParamFile]
       paramFilesList =  L.concat.L.concat $ paramFilesNest
-  opthList <- mapM (buildMongoRecords importFilter)  paramFilesList
+  opthList <- (buildMongoRecords importFilter) `parMapIO` paramFilesList
   insertTagHistoryList defaultDatabaseConfig `parMapIO_` opthList
