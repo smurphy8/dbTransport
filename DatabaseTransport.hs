@@ -92,7 +92,7 @@ an OnpingTagHistory is produced
 
 buildMongoRecords ::  (OnpingTagHistory -> Maybe OnpingTagHistory) -> ParamFile ->
                      IO [OnpingTagHistory]
-buildMongoRecords fltr !(ParamFile (DatedFile _ pFile))  = do 
+buildMongoRecords fltr (ParamFile (DatedFile _ pFile))  = do 
   hPidFile <- openPidFileObj pFile
   let ePidNum = (toText posix).dirname $ pFile --error if empty
   case ePidNum of 
@@ -104,7 +104,6 @@ buildMongoRecords fltr !(ParamFile (DatedFile _ pFile))  = do
 
 
 -- | The parser below is dumb and doesn't check for repeats, use your mongo Index unique true to ensure no repeats
-
 runOnpingHistoryParser pidNum hndle = do 
   pidLines <- getPidLines hndle
   let dirtyList = catMaybes.rights $ buildOnpingTagHistory.(\line ->  NameAndLine pidNum line) <$> pidLines
@@ -151,6 +150,7 @@ othToDocument _ = Nothing
 
 
 fullDateString = P.many (P.noneOf ",")
+
 valueString = do
   P.many (P.noneOf "\n")
 
@@ -161,11 +161,8 @@ valueString = do
 -- | (OnpingTagHistory -> Maybe OnpingTagHistory)
 insertTagHistoryList _ [] = return (Right ())
 insertTagHistoryList mcfg opthList = do 
-  print "connecting"
   pipe <- runIOE $ connect (host $ mongoHost mcfg)
-  print "accessing"
   e <- access pipe master (mongoDB mcfg) (runDB mcfg opthList)
-  print "closing"
   close pipe 
   return e 
 
@@ -190,10 +187,13 @@ dateRangeFilter (Just st) (Just end) o@(OnpingTagHistory (Just t) (Just p) (Just
 dateRangeFilter _ _ _ = Nothing
 
 
-tmpParamTime = (encodeString posix).filename.touchFile.getParamFile 
+encodeText f = case toText posix f of 
+                 Left t -> t
+                 Right t -> t
+              
 
 getParamTime :: ParamFile -> Maybe UTCTime
-getParamTime = parseFileDate.(encodeString posix).filename.touchFile.getParamFile 
+getParamTime = parseFileDate.unpack.(Filesystem.Path.Rules.encode darwin).filename.touchFile.getParamFile 
 
 checkParamTime :: StartTime UTCTime -> EndTime UTCTime -> ParamFile -> UTCTime -> Maybe ParamFile
 checkParamTime (StartTime s) (EndTime e) p t
@@ -233,18 +233,14 @@ importOnpingHistory mcfg rcfg = do
   print locationPaths
   putStrLn "getting Param Paths"
   paramPaths <- mapM getParamPaths locationPaths
-  print paramPaths
   putStrLn "config options"
   print rcfg
   putStrLn "getting ParamFile Names"
-  
   paramFilesNest <- mapM (mapM (getFilterParamFileNames filterFcn)) paramPaths
   let paramFilesList :: [ParamFile]
       paramFilesList = L.concat.L.concat $ paramFilesNest
-  mapM print paramFilesList
   putStrLn "Building mongo records"
 --  buildAndInsert rcfg `mapM` paramFilesList
-  putStr "done"
   opthList <- (buildMongoRecords importFilter) `mapM` paramFilesList
   putStrLn "Inserting mongo Records"
   insertTagHistoryList defaultDatabaseConfig `mapM_` opthList
