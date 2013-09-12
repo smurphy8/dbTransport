@@ -22,7 +22,7 @@ main = do
   _ <- case filterArgs args of 
          Test -> runTests
          Help -> runHelp
-         Run cfg -> importOnpingHistory defaultDatabaseConfig cfg
+         Run cfg -> putStrLn "begginning" >> importOnpingHistory defaultDatabaseConfig cfg
          Fail -> runFail args
   return ()
 

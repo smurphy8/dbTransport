@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings#-}
 
+
+
 module DatabaseTransport where 
 import Prelude hiding (FilePath)
 import qualified Prelude as Pl
@@ -27,8 +29,6 @@ import Filesystem.Path.Rules
 import Control.Applicative
 import Control.Concurrent.Spawn (parMapIO_,parMapIO)
 
-
-
 -- |Takes the Archive Root and returns a list of the locations
 -- | Builders for specific types of files
 -- | Top folder level of the archive Tree
@@ -47,11 +47,14 @@ getParamPaths (LocationPath (DatedFile _ lPath)) = do
   return $ (\x -> ParamPath x) <$> sf
 
 -- |These are the files inside each raw parameter Id folder
--- | They are named after dates and contain OnpingTagHistory records
+-- | They are named after dates and contain OnpingTagHistory records  
 getParamFileNames :: ParamPath -> IO [ParamFile]
 getParamFileNames (ParamPath (DatedFile _ pPath)) = do
   sf <- retrieveSubFiles pPath
   return $ (\x -> ParamFile x) <$> sf
+
+
+
 
 -- | Dated File Builders for the file system
 -- makes a DatedFile, a type with a date modified extracted to the front
@@ -87,18 +90,13 @@ buildMongoRecords ::  (OnpingTagHistory -> Maybe OnpingTagHistory) -> ParamFile 
                      IO [OnpingTagHistory]
 buildMongoRecords fltr (ParamFile (DatedFile _ pFile))  = do 
   hPidFile <- openPidFileObj pFile
-  let ePidNum = (toText windows).dirname $ pFile --error if empty
+  let ePidNum = (toText posix).dirname $ pFile --error if empty
   case ePidNum of 
-    Left _ -> return []
-    Right pidNum -> do  
+    Left _ -> putStrLn "error parsing dir" >> return []
+    Right pidNum -> do                  
                 lst <- runOnpingHistoryParser pidNum hPidFile
                 SIO.hClose hPidFile
                 return $ catMaybes $ fltr <$>  lst
-
-
- 
-
-
 
 
 -- | The parser below is dumb and doesn't check for repeats, use your mongo Index unique true to ensure no repeats
@@ -107,9 +105,6 @@ runOnpingHistoryParser pidNum hndle = do
   pidLines <- getPidLines hndle
   let dirtyList = catMaybes.rights $ buildOnpingTagHistory.(\line ->  NameAndLine pidNum line) <$> pidLines
   return dirtyList 
-
-
-
 
 
 
@@ -162,9 +157,11 @@ valueString = do
 -- | (OnpingTagHistory -> Maybe OnpingTagHistory)
 insertTagHistoryList _ [] = return (Right ())
 insertTagHistoryList mcfg opthList = do 
-  print opthList
+  print "connecting"
   pipe <- runIOE $ connect (host $ mongoHost mcfg)
+  print "accessing"
   e <- access pipe master (mongoDB mcfg) (runDB mcfg opthList)
+  print "closing"
   close pipe 
   return e 
 
@@ -190,19 +187,56 @@ dateRangeFilter _ _ _ = Nothing
   
 
   
+mkDateRangeFileFilter :: Maybe (StartTime UTCTime )-> Maybe (EndTime UTCTime)-> Either Text FileFilter
+mkDateRangeFileFilter (Just (StartTime st)) (Just (EndTime end))
+    |(st < end) = let getParamTime :: ParamFile -> Maybe UTCTime
+                      getParamTime = parseFileDate.show.filename.touchFile.getParamFile 
+                      checkParamTime :: ParamFile -> UTCTime -> Maybe ParamFile
+                      checkParamTime p t
+                        |(st <= t) && (end > t) = Just p
+                        |otherwise = Nothing
+                      filterFcn :: ParamFile -> Maybe ParamFile
+                      filterFcn pf = (getParamTime >=> (checkParamTime pf)) pf
+                  in Right $ FileFilter filterFcn 
 
 
-defaultDatabaseConfig = MongoConfig "127.0.0.1" "test" "onping_tag_history"
+    |otherwise = Left $  ("Error Expecting Start less than End Recieved: Start = " `Data.Text.append` (pack.show $ st))
+                         `Data.Text.append`
+                         ("End = " `Data.Text.append` (pack.show $ end ))
+                 
+
+mkDateRangeFilter _ _ = Left "Error Missing parameter"
+
+                  
+
+defaultDatabaseConfig = MongoConfig "10.61.187.194" "onping_production" "onping_tag_history"
 
 
 importOnpingHistory mcfg rcfg = do 
+
   let importFilter = dateRangeFilter (startDate rcfg) (endDate rcfg)
+  putStrLn "Getting Location Paths"
   locationPaths <- getLocationPaths (archivePath rcfg) 
+  print locationPaths
+  putStrLn "getting Param Paths"
   paramPaths <- mapM getParamPaths locationPaths
+  print paramPaths
+  putStrLn "config options"
+  print rcfg
+  putStrLn "getting ParamFile Names"
   paramFilesNest <- mapM (mapM getParamFileNames) paramPaths
   let paramFilesList :: [ParamFile]
       paramFilesList =  L.concat.L.concat $ paramFilesNest
+  mapM print paramFilesList
   putStrLn "Building mongo records"
-  opthList <- (buildMongoRecords importFilter) `parMapIO` paramFilesList
+--  buildAndInsert rcfg `mapM` paramFilesList
+  putStr "done"
+  opthList <- (buildMongoRecords importFilter) `mapM` paramFilesList
   putStrLn "Inserting mongo Records"
-  insertTagHistoryList defaultDatabaseConfig `parMapIO_` opthList
+  insertTagHistoryList defaultDatabaseConfig `mapM_` opthList
+
+buildAndInsert rcfg x = do
+  let importFilter = dateRangeFilter (startDate rcfg) (endDate rcfg)
+  opth <- (buildMongoRecords importFilter) x
+  insertTagHistoryList defaultDatabaseConfig opth
+  
