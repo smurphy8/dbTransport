@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings#-}
+{-# LANGUAGE OverloadedStrings, BangPatterns #-}
 
 
 
@@ -48,12 +48,16 @@ getParamPaths (LocationPath (DatedFile _ lPath)) = do
 
 -- |These are the files inside each raw parameter Id folder
 -- | They are named after dates and contain OnpingTagHistory records  
+getFilterParamFileNames :: FileFilter -> ParamPath -> IO [ParamFile]
+getFilterParamFileNames (FileFilter fltrFcn) (ParamPath (DatedFile _ pPath)) = do
+  sf <- retrieveSubFiles pPath
+  return $ catMaybes $ fltrFcn.(\x -> ParamFile x) <$> sf
+
+
 getParamFileNames :: ParamPath -> IO [ParamFile]
 getParamFileNames (ParamPath (DatedFile _ pPath)) = do
   sf <- retrieveSubFiles pPath
-  return $ (\x -> ParamFile x) <$> sf
-
-
+  return $ (\x -> ParamFile x ) <$> sf
 
 
 -- | Dated File Builders for the file system
@@ -88,7 +92,7 @@ an OnpingTagHistory is produced
 
 buildMongoRecords ::  (OnpingTagHistory -> Maybe OnpingTagHistory) -> ParamFile ->
                      IO [OnpingTagHistory]
-buildMongoRecords fltr (ParamFile (DatedFile _ pFile))  = do 
+buildMongoRecords fltr !(ParamFile (DatedFile _ pFile))  = do 
   hPidFile <- openPidFileObj pFile
   let ePidNum = (toText posix).dirname $ pFile --error if empty
   case ePidNum of 
@@ -184,25 +188,28 @@ dateRangeFilter (Just st) (Just end) o@(OnpingTagHistory (Just t) (Just p) (Just
     | (st < end) && (st <= t) && (end > t) = Just o
     | otherwise = Nothing
 dateRangeFilter _ _ _ = Nothing
-  
 
+
+tmpParamTime = (encodeString posix).filename.touchFile.getParamFile 
+
+getParamTime :: ParamFile -> Maybe UTCTime
+getParamTime = parseFileDate.(encodeString posix).filename.touchFile.getParamFile 
+
+checkParamTime :: StartTime UTCTime -> EndTime UTCTime -> ParamFile -> UTCTime -> Maybe ParamFile
+checkParamTime (StartTime s) (EndTime e) p t
+  |(s <= t) && (e > t) = Just p
+  |otherwise = Nothing
   
 mkDateRangeFileFilter :: Maybe (StartTime UTCTime )-> Maybe (EndTime UTCTime)-> Either Text FileFilter
-mkDateRangeFileFilter (Just (StartTime st)) (Just (EndTime end))
-    |(st < end) = let getParamTime :: ParamFile -> Maybe UTCTime
-                      getParamTime = parseFileDate.show.filename.touchFile.getParamFile 
-                      checkParamTime :: ParamFile -> UTCTime -> Maybe ParamFile
-                      checkParamTime p t
-                        |(st <= t) && (end > t) = Just p
-                        |otherwise = Nothing
-                      filterFcn :: ParamFile -> Maybe ParamFile
-                      filterFcn pf = (getParamTime >=> (checkParamTime pf)) pf
+mkDateRangeFileFilter (Just st@(StartTime s)) (Just en@ (EndTime e))
+    |(s < e)    = let filterFcn :: ParamFile -> Maybe ParamFile
+                      filterFcn pf = (getParamTime >=> (checkParamTime st en pf)) pf
                   in Right $ FileFilter filterFcn 
 
 
-    |otherwise = Left $  ("Error Expecting Start less than End Recieved: Start = " `Data.Text.append` (pack.show $ st))
+    |otherwise = Left $  ("Error Expecting Start less than End Recieved: Start = " `Data.Text.append` (pack.show $ s))
                          `Data.Text.append`
-                         ("End = " `Data.Text.append` (pack.show $ end ))
+                         ("End = " `Data.Text.append` (pack.show $ e))
                  
 
 mkDateRangeFilter _ _ = Left "Error Missing parameter"
@@ -213,8 +220,14 @@ defaultDatabaseConfig = MongoConfig "10.61.187.194" "onping_production" "onping_
 
 
 importOnpingHistory mcfg rcfg = do 
-
-  let importFilter = dateRangeFilter (startDate rcfg) (endDate rcfg)
+  let strt = startDate rcfg
+      end = endDate rcfg
+      
+      importFilter = dateRangeFilter (startDate rcfg) (endDate rcfg)
+      st = strt >>= (\s -> return $ StartTime s)
+      en  = end >>= (\e -> return $ EndTime e)
+  (Right filterFcn) <- return $  (mkDateRangeFileFilter st en)
+      
   putStrLn "Getting Location Paths"
   locationPaths <- getLocationPaths (archivePath rcfg) 
   print locationPaths
@@ -224,9 +237,10 @@ importOnpingHistory mcfg rcfg = do
   putStrLn "config options"
   print rcfg
   putStrLn "getting ParamFile Names"
-  paramFilesNest <- mapM (mapM getParamFileNames) paramPaths
+  
+  paramFilesNest <- mapM (mapM (getFilterParamFileNames filterFcn)) paramPaths
   let paramFilesList :: [ParamFile]
-      paramFilesList =  L.concat.L.concat $ paramFilesNest
+      paramFilesList = L.concat.L.concat $ paramFilesNest
   mapM print paramFilesList
   putStrLn "Building mongo records"
 --  buildAndInsert rcfg `mapM` paramFilesList

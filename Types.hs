@@ -23,7 +23,7 @@ data BuildableObject = B_OTH !OnpingTagHistory
 type Buildable a = NameAndLine -> Either String (a,Text)
 
 
-newtype FileFilter = FileFilter (ParamFile -> Maybe ParamFile)
+newtype FileFilter = FileFilter { getFileFilter :: (ParamFile -> Maybe ParamFile)}
 
 newtype StartTime a = StartTime { getStartTime :: a}
                     deriving (Eq,Read,Show)
@@ -37,7 +37,7 @@ newtype EndTime a = EndTime { getEndTime :: a }
 -- | Simple Parsers for Time and Value 
 
 parseFileDate :: String -> Maybe UTCTime
-parseFileDate = (parseTime defaultTimeLocale "%F")
+parseFileDate = (parseTime defaultTimeLocale "%F.txt")
 
 parseArchiveTime::Text -> Maybe UTCTime
 parseArchiveTime = (parseTime defaultTimeLocale "%F %X").unpack.fst.(breakOn ",")
