@@ -1,5 +1,5 @@
 Name:                DatabaseTransport
-Version:             0.0.1
+Version:             0.1.1
 Description:         transfer files from Slow File System to Database
 License:             BSD3
 License-file:        LICENSE
