@@ -4,16 +4,29 @@ import Data.Time
 import System.Locale
 import Prelude hiding (FilePath)
 import Safe
+
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import Data.Csv
 import Data.Text
 import System.Directory
 import Filesystem 
 import Filesystem.Path
+
 
 data OnpingTagHistory = OnpingTagHistory { 
       time :: Maybe UTCTime,
       pid:: Maybe Int,
       val :: Maybe Double
 } deriving (Read, Show, Eq,Ord)
+
+
+
+instance ToNamedRecord OnpingTagHistory where 
+  toNamedRecord (OnpingTagHistory time pid val) = namedRecord [ "time" .= (encodeArchiveTime time), (BC.pack.show $ pid ) .= val]
+
+instance ToRecord OnpingTagHistory where 
+    toRecord (OnpingTagHistory t p v) = record [toField (encodeArchiveTime t), toField v]
 
 data NameAndLine = NameAndLine { nlName::Text, nlLine::Text}
 
@@ -44,6 +57,10 @@ parseArchiveTime = (parseTime defaultTimeLocale "%F %X").unpack.fst.(breakOn ","
 
 parseArchiveTime':: String -> Maybe UTCTime
 parseArchiveTime' = (parseTime defaultTimeLocale "%F %X")
+
+encodeArchiveTime :: Maybe UTCTime => String
+encodeArchiveTime (Just t) = (formatTime defaultTimeLocale "%F %X") t
+encodeArchiveTime Nothing = ""
 
 parseArchiveValue :: Text -> Maybe Double
 parseArchiveValue = readMay.unpack.strip.snd.(breakOnEnd ",") 

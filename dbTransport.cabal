@@ -55,6 +55,8 @@ library
                        ,http-conduit             >= 1.9.3     &&   < 2.0
                        ,safe                     >= 0.3.3     &&   < 0.4.3
                        ,text                     >= 0.11.2 
+                       ,cassava                  >= 0.2.2.0
+                       ,vector                   >= 0.10.9.1
                        
 
 Executable importFolder
