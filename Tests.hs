@@ -6,7 +6,12 @@ import System.Environment
 import System.Directory
 import Control.Monad
 import Control.Applicative
+import qualified Data.Vector as V
+import qualified Data.Set as S
+import Data.Csv
 import Data.Text
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Text.Parsec as P
 import Types
 import qualified Data.List as L
@@ -112,3 +117,7 @@ testInsertMongoRecords = do
       
 
   
+testEncodeCSVOnpingTagHistory = do 
+  records <- testBuildMongoRecords 
+  let names = V.fromList.L.reverse.S.toList.S.fromList $ "time":(BC.pack.show.pid <$> records)
+  return $ encodeByName names $ V.fromList records

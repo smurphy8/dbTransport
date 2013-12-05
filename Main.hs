@@ -9,7 +9,7 @@ import Data.Text
 import Data.List
 import Tests
 import Types
-import Args
+
 import System.IO
 
 
@@ -18,17 +18,17 @@ import System.IO
 
 main :: IO () 
 main = do 
-  args <- getArgs
-  _ <- case filterArgs args of 
-         Test -> runTests
-         Help -> runHelp
-         Run cfg -> putStrLn "begginning" >> importOnpingHistory defaultDatabaseConfig cfg
-         Fail -> runFail args
   return ()
 
+  -- args <- getArgs
+  -- _ <- case filterArgs args of 
+  --        Test -> runTests
+  --        Help -> runHelp
+  --        Run cfg -> putStrLn "begginning" >> importOnpingHistory defaultDatabaseConfig cfg
+  --        Fail -> runFail args
 
 
 
 
--- |CommandLine Options
+-- |Commandline Options
 
