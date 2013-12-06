@@ -90,11 +90,11 @@ makeLocationCSV f = do
   putStrLn "build names"         
   let othSet = S.fromList $ concat othLst
       ns = nameSet othSet
-      names = V.fromList.L.reverse $ "time" : ( S.toList $ S.map (BC.pack.show.pid)  othSet      )
+      names = V.fromList $ "time" : ( S.toList $ S.map (BC.pack.show.pid)  othSet      )
   print names
   putStrLn "build CSV"
   let repVect = makeReportVector.(makeOnpingReportMap ns).V.fromList.S.toList $ othSet  
-  B.writeFile "report_output.csv"  $ LB.toStrict $  encodeByName names   $ traceShow ((V.take 5) repVect ) repVect 
+  B.writeFile "report_output.csv"  $ LB.toStrict $  encodeByName names   $  repVect 
   putStrLn "done"
 
 
