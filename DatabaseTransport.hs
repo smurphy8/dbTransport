@@ -38,27 +38,27 @@ import Control.Concurrent.Spawn (parMapIO_,parMapIO)
 getLocationPaths :: FilePath -> IO [LocationPath]
 getLocationPaths arcRoot = do
   sf <- retrieveSubFolders arcRoot
-  return $ (\x -> LocationPath x)  <$> sf
+  return $ LocationPath   <$> sf
 
 -- | Param paths are the next nest down, with 
 -- the raw parameter ids making the names
 getParamPaths :: LocationPath -> IO [ParamPath] 
 getParamPaths (LocationPath (DatedFile _ lPath)) = do
   sf <- retrieveSubFolders lPath
-  return $ (\x -> ParamPath x) <$> sf
+  return $ ParamPath  <$> sf
 
 -- |These are the files inside each raw parameter Id folder
 -- | They are named after dates and contain OnpingTagHistory records  
 getFilterParamFileNames :: FileFilter -> ParamPath -> IO [ParamFile]
 getFilterParamFileNames (FileFilter fltrFcn) (ParamPath (DatedFile _ pPath)) = do
   sf <- retrieveSubFiles pPath
-  return $ catMaybes $ fltrFcn.(\x -> ParamFile x) <$> sf
+  return $ catMaybes $ fltrFcn.ParamFile  <$> sf
 
 
 getParamFileNames :: ParamPath -> IO [ParamFile]
 getParamFileNames (ParamPath (DatedFile _ pPath)) = do
   sf <- retrieveSubFiles pPath
-  return $ (\x -> ParamFile x ) <$> sf
+  return $  ParamFile  <$> sf
 
 
 -- | Dated File Builders for the file system
@@ -127,18 +127,18 @@ getPidLines hPidFile = do
 -- | From O'Sullivan, but adapted to use Text
 
 parseEntry :: Maybe Int -> Text -> Either P.ParseError (Maybe OnpingTagHistory)
-parseEntry pid i = P.parse (entryString pid) "(unknown)" i
+parseEntry !pid !i = P.parse (entryString pid) "(unknown)" i
 
 
 -- | Entry string takes advantage of the monadic form of Maybe to short circuit missing data pieces
 entryString mpid = do
-  fDate <- fullDateString
+  !fDate <- fullDateString
   P.char ','
-  val <- valueString
+  !val <- valueString
   let oth = do
-        d <- parseArchiveTime' fDate 
-        v <- parseArchiveValue' val
-        pid <- mpid
+        !d <- parseArchiveTime' fDate 
+        !v <- parseArchiveValue' val
+        !pid <- mpid
         return $ OnpingTagHistory (Just d) (Just pid) (Just v)        
   return $ oth
 
