@@ -21,6 +21,7 @@ import Control.Monad.Trans.Either
 import Control.Monad.Trans.Class
 import qualified System.IO as SIO
 import qualified Data.List as L
+import qualified Data.Vector as V
 import Data.Function 
 import System.Directory
 import Filesystem 
@@ -100,8 +101,10 @@ buildMongoRecords fltr (ParamFile (DatedFile _ pFile))  = do
     Right pidNum -> do                  
                 lst <- runOnpingHistoryParser pidNum hPidFile
                 SIO.hClose hPidFile
-                return $ catMaybes $ fltr <$>  lst
-
+                return $ (V.foldl' foldFcn []).V.reverse $ V.map fltr  (V.fromList lst)
+                  where foldFcn a (Just b) = b:a
+                        foldFcn a Nothing  = a
+                     
 
 -- | The parser below is dumb and doesn't check for repeats, use your mongo Index unique true to ensure no repeats
 runOnpingHistoryParser pidNum hndle = do 

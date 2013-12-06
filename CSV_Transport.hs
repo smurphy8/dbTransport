@@ -6,6 +6,7 @@ import Data.Csv
 import Prelude
 import DatabaseTransport
 import Control.Applicative
+import Control.Concurrent.Spawn
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.List as L
@@ -70,8 +71,9 @@ makeLocationCSV f = do
   putStrLn "put params"      
   pp <- getParamPaths lp
   pf <- mapM getParamFileNames pp
+  let selectedFilter = idFilter -- dateRangeFilter timeStart timeEnd
   putStrLn "build data"      
-  othLst <- mapM (buildMongoRecords $ dateRangeFilter timeStart timeEnd) (concat pf)
+  othLst <- parMapIO (buildMongoRecords $ selectedFilter ) (concat pf)
   let othSet = S.fromList $ concat othLst
       names = V.fromList.L.reverse $ "time" : ( S.toList $ S.map (BC.pack.show.pid)  othSet      )
   print names

@@ -19,7 +19,7 @@ import System.IO
 
 main :: IO () 
 main = do
-  makeLocationCSV "/home/scott/programs/oneoff_reports/219"  
+  makeLocationCSV "testArchive/105/" -- "/home/scott/programs/oneoff_reports/219"  
   return ()
 
   -- args <- getArgs
