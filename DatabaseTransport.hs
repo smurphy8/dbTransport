@@ -101,16 +101,13 @@ buildMongoRecords fltr (ParamFile (DatedFile _ pFile))  = do
     Right pidNum -> do                  
                 lst <- runOnpingHistoryParser pidNum hPidFile
                 SIO.hClose hPidFile
-                return $ (V.foldl' foldFcn []).V.reverse $ V.map fltr  (V.fromList lst)
-                  where foldFcn a (Just b) = b:a
-                        foldFcn a Nothing  = a
-                     
+                return $ catMaybes $ fltr <$>  lst
 
 -- | The parser below is dumb and doesn't check for repeats, use your mongo Index unique true to ensure no repeats
 runOnpingHistoryParser pidNum hndle = do 
   pidLines <- getPidLines hndle
-  let dirtyList = catMaybes.rights $ buildOnpingTagHistory.(\line ->  NameAndLine pidNum line) <$> pidLines
-  return dirtyList 
+  return $ catMaybes.rights $ buildOnpingTagHistory.(\(line) ->  NameAndLine pidNum line) <$> pidLines
+ 
 
 
 
@@ -127,18 +124,18 @@ getPidLines hPidFile = do
 -- | From O'Sullivan, but adapted to use Text
 
 parseEntry :: Maybe Int -> Text -> Either P.ParseError (Maybe OnpingTagHistory)
-parseEntry !pid !i = P.parse (entryString pid) "(unknown)" i
+parseEntry pid i = P.parse (entryString pid) "(unknown)" i
 
 
 -- | Entry string takes advantage of the monadic form of Maybe to short circuit missing data pieces
 entryString mpid = do
-  !fDate <- fullDateString
+  fDate <- fullDateString
   P.char ','
-  !val <- valueString
+  val <- valueString
   let oth = do
-        !d <- parseArchiveTime' fDate 
-        !v <- parseArchiveValue' val
-        !pid <- mpid
+        d <- parseArchiveTime' fDate 
+        v <- parseArchiveValue' val
+        pid <- mpid
         return $ OnpingTagHistory (Just d) (Just pid) (Just v)        
   return $ oth
 

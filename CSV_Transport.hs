@@ -3,10 +3,13 @@ module CSV_Transport where
 
 import Data.Time
 import Data.Csv
-import Prelude
+import Prelude hiding (FilePath)
 import DatabaseTransport
 import Control.Applicative
 import Control.Concurrent.Spawn
+import Filesystem ()
+import Filesystem.Path (FilePath)
+import Debug.Trace
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.List as L
@@ -22,8 +25,10 @@ import Types
 
 -- makeLocationCSV :: FilePath -> IO ()
 
+timeStart :: Maybe UTCTime
 timeStart = parseArchiveTime "2012-08-02 00:00:00"
 
+timeEnd :: Maybe UTCTime
 timeEnd = parseArchiveTime "2012-08-16 00:12:45"
 
 data OnpingReportRow = OPRR { oprrTime :: UTCTime, oprrData :: S.Set OnpingTagHistory}
@@ -47,14 +52,21 @@ insertOnpingReportRow tgt  o@(OPRR tm od) = case S.member tgt  od of
   True -> o
   False -> OPRR tm (S.insert tgt od )
 
-emptyReportRow t = OPRR t (S.empty)
+emptyReportRow :: NameSet -> UTCTime -> OnpingReportRow
+emptyReportRow ns t = OPRR t (S.map (\p -> p { time = (Just t)} ) ns)
 
-makeOnpingReportMap :: V.Vector OnpingTagHistory -> OnpingReport
-makeOnpingReportMap v = OnpingReport $ V.foldl' foldFcn M.empty v
-                          where foldFcn = (\opr cand@(OnpingTagHistory (Just t) pid v) ->
-                                            case M.lookup t opr of
-                                              (Just reportRow) -> M.insert t (insertOnpingReportRow cand reportRow ) opr
-                                              Nothing          -> M.insert t (emptyReportRow t) opr ) 
+nameSet :: S.Set OnpingTagHistory -> S.Set OnpingTagHistory
+nameSet s = S.map nothingButTheName s
+    where nothingButTheName (OnpingTagHistory _ p _) = OnpingTagHistory Nothing p Nothing
+
+type NameSet = S.Set OnpingTagHistory
+
+makeOnpingReportMap :: NameSet -> V.Vector OnpingTagHistory -> OnpingReport
+makeOnpingReportMap ns v = OnpingReport $ V.foldl' foldFcn M.empty v
+    where foldFcn = (\opr cand@(OnpingTagHistory (Just t) _ _) ->
+                         case M.lookup t opr of
+                           (Just reportRow) -> M.insert t (insertOnpingReportRow cand reportRow ) opr
+                           Nothing          -> M.insert t (insertOnpingReportRow cand $ (emptyReportRow ns t)) opr ) 
 
 
 
@@ -62,25 +74,27 @@ makeReportVector :: OnpingReport -> V.Vector OnpingReportRow
 makeReportVector (OnpingReport onpingR)  = V.fromList $  M.foldl foldFcn [] onpingR
   where foldFcn = (\rList rr -> rr:rList)
 
+makeLocationCSV :: FilePath -> IO () 
 makeLocationCSV f = do
   putStrLn "Get Time"
   t  <- getCurrentTime
   putStrLn "Get Location"  
-  lfp <- getLocationPaths f
+--  lfp <- getLocationPaths f
   let lp = (LocationPath (DatedFile t f))
+  let selectedFilter = idFilter -- dateRangeFilter timeStart timeEnd
   putStrLn "put params"      
   pp <- getParamPaths lp
-  pf <- mapM getParamFileNames pp
-  let selectedFilter = idFilter -- dateRangeFilter timeStart timeEnd
+  !pf <- (mapM getParamFileNames pp)>>= (\lst -> return $ concat lst)
   putStrLn "build data"      
-  othLst <- parMapIO (buildMongoRecords $ selectedFilter ) (concat pf)
+  !othLst <- mapM (buildMongoRecords $ selectedFilter ) (pf)
+  putStrLn "build names"         
   let othSet = S.fromList $ concat othLst
+      ns = nameSet othSet
       names = V.fromList.L.reverse $ "time" : ( S.toList $ S.map (BC.pack.show.pid)  othSet      )
   print names
   putStrLn "build CSV"
-  let repVect = makeReportVector.makeOnpingReportMap.V.fromList.S.toList $ othSet
-  print repVect
-  B.writeFile "report_output.csv"  $ LB.toStrict $  encodeByName names $ repVect
+  let repVect = makeReportVector.(makeOnpingReportMap ns).V.fromList.S.toList $ othSet  
+  B.writeFile "report_output.csv"  $ LB.toStrict $  encodeByName names   $ traceShow ((V.take 5) repVect ) repVect 
   putStrLn "done"
 
 

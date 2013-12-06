@@ -29,7 +29,6 @@ library
                         EmptyDataDecls
                         NoMonomorphismRestriction
                         TypeFamilies
-                        Arrows
 
     Build-Depends:      base                     >= 3         &&   < 5
                        ,persistent-mongoDB       >= 1.2       &&   < 1.3
@@ -64,7 +63,8 @@ Executable importFolder
     main-is:            Main.hs
     build-depends:      base
                                           
-    ghc-options:      -threaded -rtsopts -O1
+    ghc-options:      -threaded -rtsopts -O2 -Wall
+
 
 
 

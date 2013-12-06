@@ -1,19 +1,10 @@
-
 {-# LANGUAGE OverloadedStrings#-}
 module Main where 
-import DatabaseTransport 
-import System.Environment
-import System.Directory
-import Control.Monad
-import Data.Text
-import Data.List
-import Tests
-import Types
+-- import DatabaseTransport 
+
+-- import Tests
+-- import Types
 import CSV_Transport
-
-import System.IO
-
-
 
 
 
