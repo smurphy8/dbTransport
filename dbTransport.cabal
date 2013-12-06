@@ -10,6 +10,7 @@ Cabal-Version:       >=1.2
 
 library 
     exposed-modules: DatabaseTransport
+                     CSV_Transport
                      Types
                      Tests
 

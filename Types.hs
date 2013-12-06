@@ -23,7 +23,7 @@ data OnpingTagHistory = OnpingTagHistory {
 
 
 instance ToNamedRecord OnpingTagHistory where 
-  toNamedRecord (OnpingTagHistory time pid val) = namedRecord [ "time" .= (encodeArchiveTime time), (BC.pack.show $ pid ) .= val]
+  toNamedRecord (OnpingTagHistory time pid val) = namedRecord [ "time" .= (encodeArchiveTime time),"pid" .= pid , "val" .= val]
 
 instance ToRecord OnpingTagHistory where 
     toRecord (OnpingTagHistory t p v) = record [toField (encodeArchiveTime t), toField v]

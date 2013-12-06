@@ -9,6 +9,7 @@ import Data.Text
 import Data.List
 import Tests
 import Types
+import CSV_Transport
 
 import System.IO
 
@@ -17,7 +18,8 @@ import System.IO
 
 
 main :: IO () 
-main = do 
+main = do
+  makeLocationCSV "/home/scott/programs/oneoff_reports/219"  
   return ()
 
   -- args <- getArgs
