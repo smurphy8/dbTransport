@@ -10,7 +10,8 @@ import Control.Concurrent.Spawn
 import Filesystem ()
 import Filesystem.Path (FilePath)
 import Debug.Trace
-import qualified Data.Map.Strict as M
+import Control.Monad.State
+import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.List as L
 import qualified Data.Vector as V
@@ -70,9 +71,12 @@ makeOnpingReportMap ns v = OnpingReport $ V.foldl' foldFcn M.empty v
 
 
 
-makeReportVector :: OnpingReport -> V.Vector OnpingReportRow
-makeReportVector (OnpingReport onpingR)  = V.fromList $  M.foldl foldFcn [] onpingR
-  where foldFcn = (\rList rr -> rr:rList)
+makeReportVector :: NominalDiffTime -> OnpingReport -> V.Vector OnpingReportRow
+makeReportVector delta (OnpingReport onpingR)  = V.fromList $  M.foldl foldFcn [] onpingR
+  where foldFcn [] rr_target = rr_target : []
+        foldFcn rr_list@((OPRR tlast _):_) rr_target@(OPRR t _) 
+            |(abs (diffUTCTime tlast t)) >= (abs delta) = rr_target:rr_list
+            | otherwise = rr_list
 
 makeLocationCSV :: FilePath -> IO () 
 makeLocationCSV f = do
@@ -82,6 +86,7 @@ makeLocationCSV f = do
 --  lfp <- getLocationPaths f
   let lp = (LocationPath (DatedFile t f))
   let selectedFilter = idFilter -- dateRangeFilter timeStart timeEnd
+      delta = realToFrac 60
   putStrLn "put params"      
   pp <- getParamPaths lp
   !pf <- (mapM getParamFileNames pp)>>= (\lst -> return $ concat lst)
@@ -91,9 +96,8 @@ makeLocationCSV f = do
   let othSet = S.fromList $ concat othLst
       ns = nameSet othSet
       names = V.fromList $ "time" : ( S.toList $ S.map (BC.pack.show.pid)  othSet      )
-  print names
   putStrLn "build CSV"
-  let repVect = makeReportVector.(makeOnpingReportMap ns).V.fromList.S.toList $ othSet  
+  let repVect = (makeReportVector delta).(makeOnpingReportMap ns).V.fromList.S.toList $ othSet  
   B.writeFile "report_output.csv"  $ LB.toStrict $  encodeByName names   $  repVect 
   putStrLn "done"
 
