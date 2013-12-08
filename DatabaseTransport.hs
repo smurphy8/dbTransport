@@ -12,8 +12,6 @@ import Data.Time
 import Data.Maybe
 import Database.MongoDB
 import Types
-import qualified Text.Parsec as P
-import Text.Parsec.Text
 import qualified Data.Text.IO as TIO
 import Control.Monad
 import Data.Either
@@ -22,6 +20,8 @@ import Control.Monad.Trans.Class
 import qualified System.IO as SIO
 import qualified Data.List as L
 import qualified Data.Vector as V
+import Data.Attoparsec (many')
+import Data.Attoparsec.Text
 import Data.Function 
 import System.Directory
 import Filesystem 
@@ -104,6 +104,7 @@ buildMongoRecords fltr (ParamFile (DatedFile _ pFile))  = do
                 return $ catMaybes $ fltr <$>  lst
 
 -- | The parser below is dumb and doesn't check for repeats, use your mongo Index unique true to ensure no repeats
+runOnpingHistoryParser :: Text -> Handle -> IO [OnpingTagHistory]
 runOnpingHistoryParser pidNum hndle = do 
   pidLines <- getPidLines hndle
   return $ catMaybes.rights $ buildOnpingTagHistory.(\(line) ->  NameAndLine pidNum line) <$> pidLines
@@ -123,25 +124,40 @@ getPidLines hPidFile = do
 
 -- | From O'Sullivan, but adapted to use Text
 
-parseEntry :: Maybe Int -> Text -> Either P.ParseError (Maybe OnpingTagHistory)
-parseEntry pid i = P.parse (entryString pid) "(unknown)" i
+-- parseEntry :: Maybe Int -> Text -> Either P.ParseError (Maybe OnpingTagHistory)
+parseEntry pid i = parseOnly (entryString pid)  i
 
 
 -- | Entry string takes advantage of the monadic form of Maybe to short circuit missing data pieces
 entryString mpid = do
-  fDate <- fullDateString
-  P.char ','
-  val <- valueString
-  let oth = do
-        d <- parseArchiveTime' fDate 
-        v <- parseArchiveValue' val
-        pid <- mpid
-        return $ OnpingTagHistory (Just d) (Just pid) (Just v)        
-  return $ oth
+  fDate <- newParseTime --fullDateString
+  char ','
+  val <- double
+  -- let oth = do
+  --       d <- parseArchiveTime' fDate 
+  --       v <- parseArchiveValue' val
+  --       pid <- mpid
+  return $ (\d -> OnpingTagHistory (Just d) mpid (Just val) ) <$> fDate
 
 
+newParseTime  :: Parser (Maybe UTCTime)
+newParseTime = do
+  y <- decimal
+  char '-'
+  m <- decimal
+  char '-'
+  d <- decimal
+  char ' '
+  h <- decimal
+  char ':'
+  min <- decimal
+  char ':'
+  sec <- decimal
+  let seconds = 3600*h + 60*min + sec
+      dTime = secondsToDiffTime seconds      
+  return $ (\d -> UTCTime d dTime) <$> (fromGregorianValid y m d )
 
-buildOnpingTagHistory :: NameAndLine -> Either P.ParseError (Maybe OnpingTagHistory)
+-- buildOnpingTagHistory :: NameAndLine -> Either P.ParseError (Maybe OnpingTagHistory)
 buildOnpingTagHistory (NameAndLine pidT line) = parseEntry (parsePidValue pidT) line
 
 othToDocument :: OnpingTagHistory -> Maybe Document
@@ -149,10 +165,11 @@ othToDocument (OnpingTagHistory (Just dte) (Just b) (Just c) ) = Just ["time" =:
 othToDocument _ = Nothing 
 
 
-fullDateString = P.many (P.noneOf ",")
+-- fullDateString :: P.Stream s m Char => P.ParsecT s u m [Char]
+fullDateString = many' (notChar ',')
 
 valueString = do
-  P.many (P.noneOf "\n")
+  many' (notChar '\n')
 
 
 -- | insertTagHistoryListWith Filter uses a filter closure that operates

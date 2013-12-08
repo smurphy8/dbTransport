@@ -10,7 +10,7 @@ import CSV_Transport
 
 main :: IO () 
 main = do
-  makeLocationCSV "testArchive/105/" -- "/home/scott/programs/oneoff_reports/219"  
+  makeLocationCSV  "testArchive/105/" -- "/home/scott/programs/oneoff_reports/219"  
   return ()
 
   -- args <- getArgs

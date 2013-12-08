@@ -85,13 +85,13 @@ makeLocationCSV f = do
   putStrLn "Get Location"  
 --  lfp <- getLocationPaths f
   let lp = (LocationPath (DatedFile t f))
-  let selectedFilter = idFilter -- dateRangeFilter timeStart timeEnd
+  let selectedFilter =  dateRangeFilter timeStart timeEnd -- idFilter
       delta = realToFrac 60
   putStrLn "put params"      
   pp <- getParamPaths lp
   !pf <- (mapM getParamFileNames pp)>>= (\lst -> return $ concat lst)
   putStrLn "build data"      
-  !othLst <- mapM (buildMongoRecords $ selectedFilter ) (pf)
+  !othLst <- parMapIO (buildMongoRecords $ selectedFilter ) (pf)
   putStrLn "build names"         
   let othSet = S.fromList $ concat othLst
       ns = nameSet othSet
