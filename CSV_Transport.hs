@@ -92,11 +92,11 @@ makeLocationCSV f = do
   !pf <- (mapM getParamFileNames pp)>>= (\lst -> return $ concat lst)
   putStrLn "build data"
   let pbsz = 4
-      parSeparator a@(x:xs) i b = if (div i pbsz) == 0
-                                  then [b]:a
-                                  else (b:x):xs
-      parSeparator l i b = [b]:l
-  !othLst <- parMapIO (mapM (buildMongoRecords $ selectedFilter )) (V.ifoldl parSeparator [] (V.fromList pf))
+      parSeparator [] = [] 
+      parSeparator !lst = (take pbsz lst):(parSeparator (drop pbsz lst))
+
+
+  !othLst <- parMapIO (mapM (buildMongoRecords $ selectedFilter )) (parSeparator pf)
   putStrLn "build names"         
   let othSet = S.fromList $ concat $ concat othLst
       ns = nameSet othSet
