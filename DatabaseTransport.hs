@@ -95,6 +95,7 @@ buildMongoRecords ::  (OnpingTagHistory -> Maybe OnpingTagHistory) -> ParamFile 
                      IO [OnpingTagHistory]
 buildMongoRecords fltr (ParamFile (DatedFile _ pFile))  = do 
   hPidFile <- openPidFileObj pFile
+  SIO.hSetBuffering hPidFile (SIO.BlockBuffering (Just 262144))
   let ePidNum = (toText posix).dirname $ pFile --error if empty
   case ePidNum of 
     Left _ -> putStrLn "error parsing dir" >> return []

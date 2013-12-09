@@ -64,7 +64,7 @@ Executable importFolder
     main-is:            Main.hs
     build-depends:      base
                                           
-    ghc-options:      -fprof-auto -threaded -rtsopts -O2 -Wall -prof
+    ghc-options:      -threaded -rtsopts -O2 -Wall
 
 
 
